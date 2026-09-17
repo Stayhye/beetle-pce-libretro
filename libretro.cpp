@@ -1796,19 +1796,30 @@ void retro_run(void)
    video_width  = spec.DisplayRect.w;
    video_height = spec.DisplayRect.h;
 
-    uint16_t *pixels = (uint16_t *)(surf->pixels16 + surf->pitchinpix * spec.DisplayRect.y);
+   bpp_t *fb = surf->pixels + spec.DisplayRect.x + surf->pitch * spec.DisplayRect.y;
    
-   // Convert the active frame buffer row by row to fix the color swap and format mismatch
-   for (unsigned y = 0; y < height; y++)
-   {
-      convert_rgb565_to_abgr1555(
-         pixels + (y * surf->pitchinpix), 
-         pixels + (y * surf->pitchinpix), 
-         width
-      );
-   }
+   hires_blending(fb, video_width, video_height, FB_WIDTH);
 
-   video_cb(pixels, width, height, surf->pitchinpix << 1);
+	#if defined(__PS2__)
+	   for (int y = 0; y < video_height; y++)
+	   {
+		  bpp_t *row = fb + y * FB_WIDTH;
+		  for (int x = 0; x < video_width; x++)
+		  {
+			 bpp_t p = row[x];
+			 // Extract RGB565 (R: 5-bit, G: 6-bit, B: 5-bit)
+			 uint32_t r = (p >> 11) & 0x1F;
+			 uint32_t g = (p >> 5) & 0x3F;
+			 uint32_t b = p & 0x1F;
+			 
+			 // Scale Green from 6-bit to 5-bit, pack into ABGR1555
+			 g = g >> 1;
+			 row[x] = (b << 10) | (g << 5) | r;
+		  }
+	   }
+	#endif
+
+   video_cb(fb, video_width, video_height, FB_WIDTH * sizeof(bpp_t));
    
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
 
