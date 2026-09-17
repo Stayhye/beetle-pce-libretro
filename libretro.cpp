@@ -905,7 +905,13 @@ void retro_init(void)
       failed_init = true;
    }
 
-#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
+#if defined(__PS2__)
+   enum retro_pixel_format ps2_fmt = RETRO_PIXEL_FORMAT_0RGB1555;
+   if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &ps2_fmt) && log_cb)
+      log_cb(RETRO_LOG_DEBUG, "PS2 platform detected - forcing 0RGB1555 pixel format.\n");
+   else if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "Failed to set 0RGB1555 pixel format for PS2.\n");
+#elif defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
       log_cb(RETRO_LOG_DEBUG, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
