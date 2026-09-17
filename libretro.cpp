@@ -875,56 +875,10 @@ static void retro_led_interface(void)
    }
 }
 
-static void init_frameskip(void)
-{
-   if (frameskip_type > 0)
-   {
-      struct retro_audio_buffer_status_callback buf_status_cb;
-
-      buf_status_cb.callback = retro_audio_buff_status_cb;
-      if (!environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK,
-            &buf_status_cb))
-      {
-         if (log_cb)
-            log_cb(RETRO_LOG_WARN, "Frameskip disabled - frontend does not support audio buffer status monitoring.\n");
-
-         retro_audio_buff_active    = false;
-         retro_audio_buff_occupancy = 0;
-         retro_audio_buff_underrun  = false;
-         audio_latency              = 0;
-      }
-      else
-      {
-         /* Frameskip is enabled - increase frontend
-          * audio latency to minimise potential
-          * buffer underruns */
-         float frame_time_msec = 1000.0f / (float)MEDNAFEN_CORE_TIMING_FPS;
-
-         /* Set latency to 6x current frame time... */
-         audio_latency = (unsigned)((6.0f * frame_time_msec) + 0.5f);
-
-         /* ...then round up to nearest multiple of 32 */
-         audio_latency = (audio_latency + 0x1F) & ~0x1F;
-      }
-   }
-   else
-   {
-      environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
-      audio_latency = 0;
-   }
-
-   update_audio_latency = true;
-}
-
-static void check_system_specs(void)
-{
-   unsigned level = 5;
-   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
-}
-
 void retro_init(void)
 {
    struct retro_log_callback log;
+   const char *dir = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else
@@ -932,13 +886,12 @@ void retro_init(void)
 
    CDUtility_Init();
 
-   const char *dir = NULL;
-
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
    {
+      size_t last;
       retro_base_directory = dir;
       // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      size_t last = retro_base_directory.find_last_not_of("/\\");
+      last = retro_base_directory.find_last_not_of("/\\");
       if (last != std::string::npos)
          last++;
 
@@ -952,9 +905,19 @@ void retro_init(void)
       failed_init = true;
    }
 
+#if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+      log_cb(RETRO_LOG_DEBUG, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+#elif defined(WANT_32BPP)
+   enum retro_pixel_format rgb888 = RETRO_PIXEL_FORMAT_XRGB8888;
+   if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb888))
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR, "Pixel format XRGB8888 not supported by platform, cannot use %s.\n", MEDNAFEN_CORE_NAME);
+      return;
+   }
+#endif
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
       perf_get_cpu_features_cb = perf_cb.get_cpu_features;
@@ -964,22 +927,14 @@ void retro_init(void)
    bool yes = true;
    environ_cb(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &yes);
 
-   setting_initial_scanline = 0;
-   setting_last_scanline = 242;
+   setting_pce_initial_scanline = 0;
+   setting_pce_last_scanline = 242;
 
    check_system_specs();
 
+   libretro_supports_bitmasks = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
-
-   frameskip_type             = 0;
-   frameskip_threshold        = 0;
-   frameskip_counter          = 0;
-   retro_audio_buff_active    = false;
-   retro_audio_buff_occupancy = 0;
-   retro_audio_buff_underrun  = false;
-   audio_latency              = 0;
-   update_audio_latency       = false;
 }
 
 void retro_reset(void)
@@ -1841,11 +1796,20 @@ void retro_run(void)
    video_width  = spec.DisplayRect.w;
    video_height = spec.DisplayRect.h;
 
-   bpp_t *fb = surf->pixels + spec.DisplayRect.x + surf->pitch * spec.DisplayRect.y;
+    uint16_t *pixels = (uint16_t *)(surf->pixels16 + surf->pitchinpix * spec.DisplayRect.y);
    
-   hires_blending(fb, video_width, video_height, FB_WIDTH);
+   // Convert the active frame buffer row by row to fix the color swap and format mismatch
+   for (unsigned y = 0; y < height; y++)
+   {
+      convert_rgb565_to_abgr1555(
+         pixels + (y * surf->pitchinpix), 
+         pixels + (y * surf->pitchinpix), 
+         width
+      );
+   }
 
-   video_cb(fb, video_width, video_height, FB_WIDTH * sizeof(bpp_t));
+   video_cb(pixels, width, height, surf->pitchinpix << 1);
+   
    audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
 
    bool updated = false;
