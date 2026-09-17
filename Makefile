@@ -227,7 +227,7 @@ else ifeq ($(platform), ps2)
    CXX = mips64r5900el-ps2-elf-g++$(EXE_EXT)
    AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
    
-   CFLAGS += -O3 -fomit-frame-pointer -ffast-math -fno-strict-aliasing -march=r5900 -mabi=eabi
+   CFLAGS += -O3 -fomit-frame-pointer -ffast-math -fno-strict-aliasing -march=r5900 -mno-abicalls
    CXXFLAGS += $(CFLAGS)
    
    CFLAGS += -DPS2 -G0 -DWANT_16BPP -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=16
