@@ -1,5 +1,5 @@
 DEBUG = 0
-FRONTEND_SUPPORTS_RGB565 = 1
+FRONTEND_SUPPORTS_RGB565 = 0
 
 CORE_DIR := .
 
@@ -227,11 +227,12 @@ else ifeq ($(platform), ps2)
    CXX = mips64r5900el-ps2-elf-g++$(EXE_EXT)
    AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
    CFLAGS += -fomit-frame-pointer -ffast-math
-   CFLAGS += -DPS2 -DUSE_XBGR1555_FORMAT -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=16
+   CFLAGS += -DPS2 -G0 -DABGR8888 -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=16
    CFLAGS += -D_EE -I$(PS2SDK)/ee/include/ -I$(PS2SDK)/common/include/
    HAVE_DYNAREC = 1
    CPU_ARCH := mips
    STATIC_LINKING = 1
+   FRONTEND_SUPPORTS_RGB565 = 0
 
 # PSP
 else ifeq ($(platform), psp1)
