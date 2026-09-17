@@ -223,21 +223,15 @@ else ifneq (,$(filter $(platform), ps3 psl1ght))
 # PS2
 else ifeq ($(platform), ps2)
    TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = mips64r5900el-ps2-elf-gcc$(EXE_EXT)
-   CXX = mips64r5900el-ps2-elf-g++$(EXE_EXT)
-   AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
-   
-   CFLAGS += -O3 -fomit-frame-pointer -ffast-math -fno-strict-aliasing -march=r5900 -mno-abicalls
-   CXXFLAGS += $(CFLAGS)
-   
-   CFLAGS += -DPS2 -G0 -DWANT_16BPP -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=16
-   CFLAGS += -D_EE -I$(PS2SDK)/ee/include/ -I$(PS2SDK)/common/include/
-   
+   CC = mips64r5900el-ps2-elf-gcc
+   CXX = mips64r5900el-ps2-elf-g++
+   AR = mips64r5900el-ps2-elf-ar
+   CFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   CXXFLAGS += -G0 -O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -DPS2 -DABGR1555
+   STATIC_LINKING=1
+   NEED_RWAV = 0
    HAVE_DYNAREC = 1
    CPU_ARCH := mips
-   STATIC_LINKING = 1
-   FRONTEND_SUPPORTS_RGB565 = 0
-
 
 # PSP
 else ifeq ($(platform), psp1)
